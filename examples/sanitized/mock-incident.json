@@ -1,0 +1,16 @@
+{
+  "_notice": "SYNTHETIC DEMONSTRATION DATA ONLY. Not collected from a customer or Ubuntu host.",
+  "schema_version": 1,
+  "incident_id": "INC-007",
+  "service": "nginx",
+  "severity": "high",
+  "status": "resolved",
+  "summary": "Simulated Nginx outage in isolated VM",
+  "created_at": "2026-11-05T08:00:00Z",
+  "updated_at": "2026-11-05T08:20:00Z",
+  "notes": [
+    {"kind": "hypothesis", "text": "Synthetic example: suspected configuration error", "at": "2026-11-05T08:05:00Z"},
+    {"kind": "verification", "text": "SYNTHETIC ONLY: nginx -t and local HTTP checks reported healthy", "at": "2026-11-05T08:20:00Z"}
+  ],
+  "captures": {}
+}

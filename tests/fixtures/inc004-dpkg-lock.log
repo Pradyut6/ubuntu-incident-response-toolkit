@@ -1,0 +1,1 @@
+SYNTHETIC FIXTURE ONLY: E: Could not get lock /var/lib/dpkg/lock-frontend. It is held by process 1234 (apt-get).

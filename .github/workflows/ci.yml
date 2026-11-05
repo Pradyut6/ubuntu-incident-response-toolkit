@@ -1,0 +1,17 @@
+name: ubuntu-irt-checks
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    name: Bash security and integration tests
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Install Ubuntu dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq bats shellcheck shfmt iproute2 gzip tar
+      - name: Run suite without root
+        run: bash tests/run-all.sh

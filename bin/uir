@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Ubuntu Incident Response Toolkit - entry point
+# Only source code located next to this executable is loaded.
+set -euo pipefail
+umask 077
+
+UIR_PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+# shellcheck source=../lib/config.sh
+source "$UIR_PROJECT_ROOT/lib/config.sh"
+# shellcheck source=../lib/doctor.sh
+source "$UIR_PROJECT_ROOT/lib/doctor.sh"
+# shellcheck source=../lib/validate.sh
+source "$UIR_PROJECT_ROOT/lib/validate.sh"
+# shellcheck source=../lib/incident_store.sh
+source "$UIR_PROJECT_ROOT/lib/incident_store.sh"
+# shellcheck source=../lib/sanitize.sh
+source "$UIR_PROJECT_ROOT/lib/sanitize.sh"
+# shellcheck source=../lib/collect_host.sh
+source "$UIR_PROJECT_ROOT/lib/collect_host.sh"
+# shellcheck source=../lib/collect_service.sh
+source "$UIR_PROJECT_ROOT/lib/collect_service.sh"
+# shellcheck source=../lib/capture.sh
+source "$UIR_PROJECT_ROOT/lib/capture.sh"
+# shellcheck source=../lib/search.sh
+source "$UIR_PROJECT_ROOT/lib/search.sh"
+# shellcheck source=../lib/compare.sh
+source "$UIR_PROJECT_ROOT/lib/compare.sh"
+# shellcheck source=../lib/report.sh
+source "$UIR_PROJECT_ROOT/lib/report.sh"
+# shellcheck source=../lib/export.sh
+source "$UIR_PROJECT_ROOT/lib/export.sh"
+# shellcheck source=../lib/retention.sh
+source "$UIR_PROJECT_ROOT/lib/retention.sh"
+# shellcheck source=../lib/cli.sh
+source "$UIR_PROJECT_ROOT/lib/cli.sh"
+
+uir::main "$@"

@@ -1,0 +1,32 @@
+# Runtime evidence must NEVER be tracked.
+.local/
+.local/share/ubuntu-irt/
+.data/
+artifacts/
+exports/
+*.log
+*.log.*
+*.jsonl.gz
+*.txt.gz
+*.tar.gz
+*.zip
+*.vdi
+*.vmdk
+*.vbox
+*.iso
+# Editors and scratch files
+.vscode/
+.idea/
+.tmp/
+*.swp
+*~
+# Never commit private evidence or local test scratch directories.
+*.pem
+*.key
+*.p12
+.env
+.env.*
+!config/example.conf
+coverage/
+# Reviewed synthetic-only log fixtures are intentional source artifacts.
+!tests/fixtures/*.log
