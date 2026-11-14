@@ -2,7 +2,11 @@
 
 Notable project changes are recorded here. This document distinguishes development milestones from **published releases**.
 
-## [Unreleased] — 2026-11-14 — H01–H08 release preparation
+## [Unreleased]
+
+No changes recorded since the v1.0.0 release preparation.
+
+## [1.0.0] — 2026-11-14 — First CLI release (pending publication)
 
 - **H01:** Added opt-in localhost-only HTTP status, timeout and duration observation with before/after comparisons.
 - **H02:** Added TCP listening-address and expected-bind diagnostics with explicit socket-versus-service caution.
@@ -13,9 +17,9 @@ Notable project changes are recorded here. This document distinguishes developme
 - **H07:** Enforced actual decoded-byte limits on gzip inputs (including concatenated members), improved public export sanitization and report staging, and corrected failed filesystem comparability.
 - Expanded automated regression to **13 stages**. Operator's Ubuntu 24.04 WSL 2 acceptance output reported exit `0`, including 28 baseline end-to-end checks.
 - Executed twelve non-disruptive WSL 2 training exercises with explicit synthetic fixtures where appropriate. No native Ubuntu Server or VirtualBox acceptance has been claimed.
-- **H08:** Revised operator-facing documentation and incident status to reflect the current implementation. Final privacy review, clean-checkout validation, Git staging and release tag remain pending.
+- **H08:** Revised operator-facing documentation and incident status; staged and committed the release candidate. Clean worktree passed 13/13 regression stages and an isolated host incident workflow. Final privacy/history review, v1.0.0 tag and GitHub publication remain pending.
 
-> Version remains `1.0.0-rc1` in source until the final release gates are approved. Do not treat this Unreleased section as a published GitHub v1.0.0 release.
+> The CLI version is synchronized to `1.0.0` for final local verification. GitHub publication and the `v1.0.0` tag are still pending; earlier rc1 sections below are retained as historical milestones.
 
 ## [1.0.0-rc1] — 2026-11-05 — Initial CLI candidate
 

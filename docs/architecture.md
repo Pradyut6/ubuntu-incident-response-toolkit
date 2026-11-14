@@ -1,6 +1,6 @@
 # Architecture and evidence contract
 
-**Current phase:** v1.0 release candidate (CLI version `1.0.0-rc1`). **Target:** Ubuntu 24.04 LTS. **Verified:** Ubuntu 24.04 on WSL 2. **Execution:** unprivileged, local, manually invoked; no monitoring daemon or automatic repair.
+**Current phase:** v1.0.0 release preparation (CLI version `1.0.0`, GitHub publication pending). **Target:** Ubuntu 24.04 LTS. **Verified:** Ubuntu 24.04 on WSL 2. **Execution:** unprivileged, local, manually invoked; no monitoring daemon or automatic repair.
 
 ```mermaid
 flowchart TD

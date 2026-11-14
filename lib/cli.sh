@@ -3,7 +3,7 @@
 
 uir::usage() {
     cat <<'USAGE'
-Ubuntu Incident Response Toolkit (uir) — Bash CLI v1.0 release candidate
+Ubuntu Incident Response Toolkit (uir) — Bash CLI v1.0.0
 
 Usage:
   uir --help | --version

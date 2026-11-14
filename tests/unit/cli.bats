@@ -14,7 +14,7 @@ setup() { UIR="$BATS_TEST_DIRNAME/../../bin/uir"; }
 @test 'version is predictable' {
     run "$UIR" --version
     [ "$status" -eq 0 ]
-    [ "$output" = 'uir 1.0.0-rc1' ]
+    [ "$output" = 'uir 1.0.0' ]
 }
 @test 'unknown command is rejected, not executed' {
     run "$UIR" 'hello;touch /tmp/uir-unsafe'

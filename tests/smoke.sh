@@ -22,7 +22,7 @@ check() {
 
 check 'help' 0 'Usage:' --help
 check 'default help' 0 'Usage:'
-check 'version' 0 'uir 1.0.0-rc1' --version
+check 'version' 0 'uir 1.0.0' --version
 check 'unknown command' 2 'unknown command' totally-unknown
 check 'capture requires arguments' 2 'usage: capture' capture
 check 'reject unexpected doctor args' 2 'does not accept arguments' doctor --other

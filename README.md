@@ -8,7 +8,7 @@ A local, least-privilege **Bash incident-triage CLI** for Ubuntu 24.04 LTS. Capt
 
 `Bash` · `systemd` · `journalctl` · `jq` · `curl` · `ss` · `gzip` · `SHA-256` · `Bats`
 
-**Status: v1.0 release candidate — 13 automated stages passed on Ubuntu 24.04 / WSL 2; final publication and manual privacy review pending.**
+**Status: v1.0.0 release prepared (not yet published) — 13 automated stages and a clean-checkout incident workflow passed on Ubuntu 24.04 / WSL 2; final publication and manual privacy review pending.**
 
 [Quick start](#quick-start) · [CLI workflow](#a-complete-incident-workflow) · [Diagnostics](#opt-in-diagnostic-collectors) · [Testing](#testing-and-evidence) · [Security](#security-and-limitations) · [Runbooks](#incident-scenarios) · [Release checklist](docs/release-checklist.md)
 
@@ -196,7 +196,7 @@ bash tests/run-all.sh
 printf 'Regression exit: %s\n' "$?"
 ```
 
-The **November 14, 2026 WSL 2 acceptance run** reported **13/13 stages** and exit code `0`, including 28 original end-to-end integration checks, H01–H06 integration, and H07 archive-boundary/privacy tests. A subsequent log search showed only the runner's generic `SKIP` reminder, not an actual skipped-check line. This is **local automated acceptance**, not an independent penetration test or production certification. A clean checkout and manual release privacy review remain required. See [testing matrix](docs/testing.md).
+The **November 14, 2026 WSL 2 acceptance run** reported **13/13 stages** and exit code `0`, including 28 original end-to-end integration checks, H01–H06 integration, and H07 archive-boundary/privacy tests. A subsequent log search showed only the runner's generic `SKIP` reminder, not an actual skipped-check line. This is **local automated acceptance**, not an independent penetration test or production certification. A clean Git worktree passed the full regression suite, and a separately initialized private store passed the incident-create and capture smoke workflow. Manual release privacy review and GitHub publication remain pending. See [testing matrix](docs/testing.md).
 
 ## Incident scenarios
 
@@ -227,4 +227,4 @@ For responsible use see [SECURITY.md](SECURITY.md), [security model](docs/securi
 
 ## License and release status
 
-[MIT License](LICENSE). Maintained as a learning and engineering portfolio project; **not affiliated with Canonical**. Version in `lib/config.sh` remains `1.0.0-rc1` until the final clean-checkout and privacy gates are approved. The planned v1.0.0 tag and GitHub publication are **not yet claimed**.
+[MIT License](LICENSE). Maintained as a learning and engineering portfolio project; **not affiliated with Canonical**. The CLI now reports `1.0.0`, following clean-checkout acceptance on Ubuntu 24.04 / WSL 2. The `v1.0.0` Git tag and GitHub publication are **not yet claimed**; review the staged diff, relevant Git history and any outgoing artifacts before sharing.

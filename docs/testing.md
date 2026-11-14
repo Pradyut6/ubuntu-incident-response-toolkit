@@ -1,6 +1,6 @@
 # Testing matrix, evidence and release gates
 
-**Current code status:** v1.0.0-rc1. **Target:** Ubuntu 24.04 LTS. **Executed host:** Ubuntu 24.04 under WSL 2. **Not tested:** native Ubuntu Server or Oracle VirtualBox installation, adversarial multi-user evidence custody, production workloads.
+**Current code status:** v1.0.0 release preparation (not yet published). **Target:** Ubuntu 24.04 LTS. **Executed host:** Ubuntu 24.04 under WSL 2. **Not tested:** native Ubuntu Server or Oracle VirtualBox installation, adversarial multi-user evidence custody, production workloads.
 
 ## Automated tests
 
@@ -52,12 +52,12 @@ grep -nEi '^[[:space:]]*(SKIP|SKIPPED)(:|[[:space:]]|$)|^\[SKIP\]' \
 | H06 live journal visibility | INC-018, 0 records in 5 min, collector exit 0 | Observed; overall capture partial due to Nginx permission limit |
 | H07 archive/privacy regression | Concatenated gzip rejection, redaction and hashes | Automated WSL pass; external manual sharing review still required |
 | Native Ubuntu / VirtualBox | Dedicated platform smoke/recovery | **Not performed**; do not claim |
-| Clean checkout installation | Fresh clone, dependencies, quickstart, all checks | **Pending final release gate** |
-| Final staged Git diff and secret scan | Reviewed file list and staged changes | **Pending final release gate** |
-| Documentation consistency, release tag | Correct CLI version, links and changelog | **Pending final release gate** |
+| Clean checkout installation | Temporary Git worktree on native WSL filesystem | **Passed:** all 13 stages, status 0; tracked tree clean |
+| Final staged Git diff and secret scan | Staged file listing, whitespace and identifier-pattern checks | **Passed preliminary checks; full history/privacy review remains pending** |
+| Documentation consistency, release tag | Synchronized CLI version, links and changelog | **Version preparation in progress; tag and publication pending** |
 
 The operator screenshots do not replace preserved private raw evidence; no real incident archives should be added to Git. See [status tracker](incidents/STATUS.md) for the distinction between live and synthetic exercises.
 
 ## Release policy
 
-Publish `v1.0.0` only after the [release checklist](release-checklist.md) is satisfied, the on-machine test log has been reviewed, the code version is updated from `1.0.0-rc1`, and the operator approves the staged Git diff. A successful simulation or automated regression does **not** constitute a production SLA, formal penetration test, or native Ubuntu validation.
+Publish `v1.0.0` only after the [release checklist](release-checklist.md) is satisfied, the on-machine test log has been reviewed, the `1.0.0` version and test assertions pass a fresh clean-checkout run, and the operator approves the final staged Git diff and history/privacy review. A successful simulation or automated regression does **not** constitute a production SLA, formal penetration test, or native Ubuntu validation.

@@ -1,6 +1,6 @@
 # v1.0.0 publication checklist (H08)
 
-**Release state:** not published. The CLI still reports `1.0.0-rc1`. Complete the following gates **in the existing repository**, on Ubuntu 24.04 / WSL 2, before tagging `v1.0.0` or pushing a public release.
+**Release state:** not published. The CLI reports `1.0.0` after version synchronization. Complete the remaining gates **in the existing repository**, on Ubuntu 24.04 / WSL 2, before tagging `v1.0.0` or pushing a public release.
 
 ## 1. Confirm the current implementation and test tools
 
@@ -67,7 +67,7 @@ git diff --cached
 
 ## 6. Version and publish only after approval
 
-When the content and clean-checkout test are accepted, update `UIR_VERSION` in `lib/config.sh` from `1.0.0-rc1` to `1.0.0`, move the Unreleased changelog entry under `[1.0.0]`, and rerun all checks. Record the actual verification date and environment.
+The clean-checkout 13-stage suite and isolated host incident workflow passed on Ubuntu 24.04 / WSL 2. Version `1.0.0`, both version-test assertions and the changelog have been synchronized in a separate local update. Rerun all checks on the versioned commit and record the actual verification date and environment before tagging.
 
 Before any public push:
 
@@ -81,6 +81,6 @@ Confirm the remote owner/repository, whether it is public, and that no sensitive
 
 ## 7. Independent release smoke check
 
-Use a clean clone or temporary checkout, with a **new private `XDG_DATA_HOME`**, to verify installation, `doctor`, CLI help, the complete suite, case creation and a read-only capture. Do not carry private incident data into the temporary checkout. Record exact commands, exit codes, hashes and platform details as release evidence.
+The release candidate passed in a clean Linux Git worktree and an isolated private `XDG_DATA_HOME` (INC-901), with a complete host capture. Repeat the entire suite on the final versioned commit; run `doctor`, CLI help, case creation and read-only capture as appropriate. Do not carry private incident data into the temporary checkout. Record exact commands, exit codes, hashes and platform details as release evidence.
 
 **Publication decision:** GitHub v1.0.0 is ready only when tests, source review, privacy review, documentation checks, versioning and clean-checkout validation are all explicitly signed off. Otherwise keep the `rc1` label.
