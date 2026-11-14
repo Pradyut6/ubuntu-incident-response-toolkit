@@ -1,34 +1,46 @@
-# INC-XXX — [title]
+# INC-XXX — [incident title]
 
-**Execution status:** NOT RUN / IN PROGRESS / VERIFIED / BLOCKED  
-**Date and environment:** [UTC date, Ubuntu VM information]  
-**Severity:** [low/medium/high/critical]
+**Evidence classification:** Isolated WSL 2 service / synthetic fixture / native Ubuntu lab (only if proven)
+**Execution status:** NOT RUN / CAPTURED / RESOLVED / CLOSED / BLOCKED
+**Date (UTC) and environment:** [ISO timestamp, OS, WSL/kernel details]
+**Severity:** [low / medium / high / critical]
 
-## Simulated intake and customer impact
-[What cannot be done; intended service level; impact is simulated]
+> This is a training case study, **not** a production customer incident. Never paste raw private journal logs, addresses, credentials or paths into a public repo.
 
-## Chronological timeline (UTC)
-| Timestamp | Action / finding | Evidence link |
+## Simulated user impact and intake
+
+[What the fictional user could not do; intended objective and limitations of the simulation.]
+
+## Timeline (UTC)
+
+| Time | Action or observation | Sanitized evidence reference |
 | --- | --- | --- |
 | | | |
 
 ## Before evidence and hypotheses
-[Relevant `uir capture` JSON, bounded logs, commands with observed outputs; don't invent]
+
+[Report only observed `systemctl`, HTTP, socket, filesystem or journal output; flag incomplete/permission-limited captures. Specify synthetic inputs.]
 
 ## Root-cause analysis
-[Hypotheses considered, evidence for/against each, confirmed or unknown]
 
-## Corrective action and risk
-[Commands executed, reason, rollback plan]
+[Hypotheses considered, evidence for/against each; do not infer causality solely from before/after changes.]
 
-## After evidence and functional validation
-[Explicit checks including expected versus actual; `uir compare` limitations]
+## Manual remediation and rollback
 
-## Customer-facing resolution and follow-up
-[Short factual summary, customer update, KB link]
+[Precisely what was changed in the *disposable* training environment, why, and how rollback was verified.]
 
-## Security and cleanup
-[Sanitization review, VM baseline restore, no remaining fault]
+## After capture and functional verification
 
-## Reproducible results
-[Only measured outcomes: elapsed time, storage bytes, tests passed]
+[Expected versus actual: service state, application response, command exit status, `uir compare` comparability; preserve immutable original snapshots.]
+
+## Evidence and privacy handling
+
+[Whether private archive SHA-256 checks passed; whether a public synthetic excerpt was human-reviewed; no raw archives committed.]
+
+## Cleanup verification
+
+[Named service/mount/process/port removed or inactive; commands and observed outcomes, not just a claim.]
+
+## Operational takeaway
+
+[Short, reproducible troubleshooting lesson with link to relevant KB; claims grounded in evidence.]

@@ -2,268 +2,229 @@
 
 # Ubuntu Incident Response Toolkit
 
-### Investigate Linux incidents. Preserve the evidence. Explain the resolution.
+**Investigate the symptom. Preserve the evidence. Explain the recovery.**
 
-**A modular Bash CLI for Ubuntu 24.04 incident triage, bounded diagnostics, structured comparisons, searchable evidence, and sanitized handoffs.**
+A local, least-privilege **Bash incident-triage CLI** for Ubuntu 24.04 LTS. Capture bounded diagnostics, compare immutable before/after evidence, document decisions, and prepare reviewable handoff archives.
 
-`Bash` · `systemd` · `journalctl` · `jq` · `gzip` · `SHA-256` · `Bats` · `Ubuntu Server`
+`Bash` · `systemd` · `journalctl` · `jq` · `curl` · `ss` · `gzip` · `SHA-256` · `Bats`
 
-**Release: v1.0.0-rc1 — feature-complete candidate; Ubuntu VM incident acceptance pending**
+**Status: v1.0 release candidate — 13 automated stages passed on Ubuntu 24.04 / WSL 2; final publication and manual privacy review pending.**
 
-[Quickstart](#quickstart) · [Workflow](#an-end-to-end-incident-workflow) · [Security](#security-by-design) · [Tests](#testing-and-quality-gates) · [Incident catalog](#incident-lab-catalog) · [Architecture](docs/architecture.md)
+[Quick start](#quick-start) · [CLI workflow](#a-complete-incident-workflow) · [Diagnostics](#opt-in-diagnostic-collectors) · [Testing](#testing-and-evidence) · [Security](#security-and-limitations) · [Runbooks](#incident-scenarios) · [Release checklist](docs/release-checklist.md)
 
 </div>
 
 ---
 
-## Why this exists
+## Why it exists
 
-Investigating a Linux incident usually involves switching between `systemctl`, journal logs, network listeners, disk and memory health, application checks, and a written ticket. The evidence is easy to scatter or accidentally share before it has been sanitized.
+Linux incident triage often scatters evidence across `systemctl`, journals, network sockets, filesystem measurements, process listings, application checks and ticket notes. UIR creates a **repeatable local workflow**: register the incident, collect a time-bounded **before** snapshot, perform a human-reviewed correction, capture **after**, compare observed changes, and prepare an integrity-checked handoff.
 
-**UIR makes evidence collection systematic without automating risky repairs.** A support engineer tracks an incident, captures a time-bounded **before** snapshot, makes a carefully reviewed correction in an isolated lab, records the **after** snapshot, compares objective changes, and creates a compressed handoff that is easier to verify and review.
+UIR deliberately **does not fix incidents for you**. It is an educational support-engineering portfolio project—not a commercial monitoring system, a forensic evidence platform, a Canonical product, or a claim of production support experience.
 
-This is a **local, single-host training and portfolio tool**. It is not sponsored by Canonical, does not replace a production monitoring stack, and does not assert that simulated incidents were real customer outages.
+## Features at a glance
 
-## What is included
+| Area | Implemented capability |
+| --- | --- |
+| Triage | Ubuntu/WSL preflight, explicit service profiles, bounded host/service diagnostics |
+| Case management | Persistent incident ID, severity, status, UTC timestamps and typed operator notes |
+| Evidence | One immutable `before` and `after` capture per incident, compressed diagnostics and scoped journal excerpts |
+| HTTP health (**H01**) | Opt-in localhost `GET /` probe; response status, outcome, duration and timeout, no response body |
+| TCP listener (**H02**) | Opt-in port/bind-address observation; a listener is not proof of application health |
+| Filesystem (**H03**) | Opt-in target mount size, free bytes, inode measurements; stores target-path fingerprint, not raw path |
+| systemd dependencies (**H04**) | Opt-in inspection of up to eight direct `Requires=` units, observed states and `After=` relationship |
+| Process sample (**H05**) | Opt-in ranked sample of up to eight processes; names and resource values, no command-line arguments |
+| Journal visibility (**H06**) | Opt-in scoped journal *metadata* counts and transport classification; no message content in audit metadata |
+| Evidence workflow | Literal search, structured comparison, Markdown report and previewable redacted `.tar.gz` export |
+| Safeguards (**H07**) | Restricted local store, command bounds, overwrite refusal, decompressed-byte checks, SHA-256 manifest |
+| Retention | Configurable limits, explicit dry-run and confirmed pruning; never automatic |
 
-| Capability | v1.0 candidate | Why it matters |
-| --- | --- | --- |
-| Host preflight | ✅ Implemented | Shows missing dependencies, read-only journal access and WSL caveats |
-| Persistent incident lifecycle | ✅ Implemented | Unique IDs, severity, service, UTC timestamps, notes and status |
-| Bounded host observations | ✅ Implemented | Uptime, CPU load, memory, disk/inodes, network context |
-| Targeted service diagnosis | ✅ Implemented | Nginx, SSH/socket and disposable `uir-*` training units |
-| Immutable before/after captures | ✅ Implemented | Bounded journal excerpts, gzip diagnostics, explicit partial status |
-| Literal search | ✅ Implemented | Filters incident metadata and searches compressed evidence safely |
-| Structured comparison | ✅ Implemented | Highlights measured state changes, not invented causality |
-| Human-readable case report | ✅ Implemented | Separates operator notes from observed evidence |
-| Sanitized `.tar.gz` handoff | ✅ Implemented | Fixed archive membership, public redaction and SHA-256 manifest |
-| User-controlled retention | ✅ Implemented | Configurable age/size limits and explicit dry-run/prune |
-| Incident labs and KB drafts | 📖 Prepared | 12 scenario runbooks and 12 troubleshooting knowledge-base articles |
-| VM fault reproduction | ⏳ Pending | Real Ubuntu VirtualBox tests with verified recovery remain to be executed |
-| Service failure monitoring, GUI | — Deferred | v1.1 and v2; out of scope for this release |
+Every optional probe is **read-only**. A successful *collector* can record an unhealthy endpoint or absent listener. A `partial` capture means at least one collector had limited or failed execution; it must not be silently relabeled `complete`.
 
-*“Implemented” means source code and isolated synthetic integration tests exist; it does not imply production qualification or that all VM scenarios were performed.*
+## Architecture
 
-## Architecture at a glance
-
-```text
-Ubuntu support engineer
-       |
-       v
-   bin/uir  ── input/schema validation ── private incident records
-       |                                           ^
-       +── host collector ──────────────────────────┤
-       +── service/journal collector ─ redaction ─ gzip
-                                                   |
-                                     search / compare / report
-                                                   |
-                                       explicit export preview
-                                                   |
-                                 public-redact + SHA-256 manifest
-                                                   |
-                                       portable .tar.gz handoff
+```mermaid
+flowchart LR
+  A[Operator via bin/uir] --> B[Validate flags and profiles]
+  B --> C[Bounded host and service collectors]
+  B --> D[Opt-in HTTP / TCP / filesystem / dependency / process / journal audits]
+  C --> E[Private incident store]
+  D --> E
+  E --> F[Before / after comparison]
+  E --> G[Operator notes and report]
+  F --> H[Public redaction staging]
+  G --> H
+  H --> I[Allowlisted tar.gz + SHA-256]
+  I --> J[Human privacy review before sharing]
 ```
 
-Detailed [architecture, data schema and trust boundaries](docs/architecture.md) explain design trade-offs and limitations.
+See [architecture and evidence contract](docs/architecture.md), [operator handbook](docs/operations.md), and [security boundaries](docs/security.md).
 
-## Requirements
+## Platform and prerequisites
 
-- **Ubuntu Server 24.04 LTS** — target platform; a disposable **VirtualBox VM** is recommended for all fault-injection labs.
-- 2 vCPU / 2 GiB RAM / 25 GiB virtual disk is a suggested starting point, not a measured minimum.
-- Bash 5, GNU coreutils, `jq`, `gzip`, `tar`, `timeout`, `flock`, `ip`, `ss`, `systemctl`, `journalctl`, `sha256sum`.
-- Recommended verification tools: `shellcheck`, `shfmt`, `bats`.
-- Nginx and OpenSSH Server for the service-specific lab exercises.
+- **Target:** Ubuntu 24.04 LTS with Bash 5 and systemd. **Environment actually exercised:** Ubuntu 24.04 on **WSL 2**, using isolated, non-disruptive lab services and synthetic fixtures. Native Ubuntu Server and Oracle VirtualBox acceptance were **not performed**.
+- **CLI runtime:** `bash`, `jq`, GNU coreutils, `tar`, `gzip`, `timeout`, `flock`, `sha256sum`, `ip`, `ss`, `systemctl`, `journalctl`; `curl` for HTTP probes and `ps` for process probes.
+- **Development checks:** `shellcheck`, `shfmt`, `bats`; `python3` is needed by selected test fixtures, not the core CLI.
+- **Profile-specific tools:** Nginx and OpenSSH are optional, necessary only for their respective service exercises.
 
-> **WSL note:** WSL Ubuntu 24.04 is useful for editing and non-destructive tests. Do not run deliberately broken SSH, firewall, DNS or disk-exhaustion incidents inside your everyday WSL distro. For a real incident lab use the isolated Ubuntu VM and take a `CLEAN-BASELINE` snapshot first. Keep the repository and runtime store on the Linux filesystem (`~/projects/...`), not under `/mnt/c`.
-
-## Quickstart
-
-The repository remains local until user-verified tests and privacy review are complete. Unpack the **single full release package** once, or clone it after it is published.
+On Ubuntu 24.04, install the common dependencies, then run preflight:
 
 ```bash
 sudo apt update
-sudo apt install -y jq gzip tar coreutils iproute2 curl shellcheck shfmt bats
-
-# Inside your Ubuntu project directory:
-chmod +x bin/uir
-./bin/uir --help
+sudo apt install -y bash jq coreutils tar gzip iproute2 curl procps python3 shellcheck shfmt bats
 ./bin/uir --version
 ./bin/uir doctor
+```
+
+The repository may be edited under `/mnt/c` in WSL 2; the **private incident store must remain on the Linux filesystem** (default `~/.local/share/ubuntu-irt/`), not in a shared Windows folder. Do not run `sudo ./bin/uir`. Never inject failures into a work host or your primary WSL networking, firewall, package database or disk; use the documented isolated training approach.
+
+## Quick start
+
+From the repository root (no external install or daemon required):
+
+```bash
+chmod +x bin/uir
+./bin/uir --help
+./bin/uir doctor
 ./bin/uir init
+./bin/uir incident create --id INC-101 --service host --severity low \
+  --summary "Read-only host diagnostic demonstration"
+./bin/uir capture --incident INC-101 --phase before --minutes 5 \
+  --fs-path / --processes
 ```
 
-**Optional user-local command installation** (keeps files in the one project folder; does not copy code into multiple version folders):
+**Use a new incident ID:** snapshots are immutable. This example records observations only; it does not manufacture an outage. If using `INC-101` already, choose another unused ID. Inspect the JSON at `~/.local/share/ubuntu-irt/incidents/INC-101/before/snapshot.json`.
+
+## A complete incident workflow
+
+The commands below show how an operator records a **disposable Nginx training incident**. Create a fresh ID, and only run the after capture after you have independently verified recovery. Fault reproduction and remediation are **manual** and are not executed by the CLI.
 
 ```bash
-mkdir -p "$HOME/.local/bin"
-ln -s "$(pwd -P)/bin/uir" "$HOME/.local/bin/uir"
-# Ensure ~/.local/bin is on PATH for future shells, then use: uir doctor
-# To uninstall, first verify the symlink target with: readlink ~/.local/bin/uir
-# Remove only that symlink: rm "$HOME/.local/bin/uir"
+./bin/uir incident create --id INC-102 --service nginx --severity medium \
+  --summary "Isolated Nginx training service investigation"
+./bin/uir incident status --id INC-102 --value investigating
+
+# Capture the observed failure (or baseline); HTTP and listener checks are opt-in.
+./bin/uir capture --incident INC-102 --phase before --minutes 5 \
+  --http-port 18080 --listen-port 18080 --expect-address 127.0.0.1 \
+  --dependencies --journal-audit
+
+# Investigate, verify, and manually correct a disposable isolated fault.
+./bin/uir incident note --id INC-102 --kind root_cause \
+  --text "Document only a cause supported by separate evidence"
+./bin/uir incident note --id INC-102 --kind remediation \
+  --text "Document the reviewed manual change and rollback"
+
+# Use the same opt-in checks in both phases to make meaningful comparisons.
+./bin/uir capture --incident INC-102 --phase after --minutes 5 \
+  --http-port 18080 --listen-port 18080 --expect-address 127.0.0.1 \
+  --dependencies --journal-audit
+./bin/uir compare --incident INC-102
+./bin/uir incident note --id INC-102 --kind verification \
+  --text "Record an independently observed functional check"
+./bin/uir incident status --id INC-102 --value resolved
+./bin/uir report --incident INC-102
+./bin/uir export --incident INC-102 --preview
+# Export into a private location OUTSIDE the Git checkout, after reviewing preview.
+./bin/uir export --incident INC-102 --output "$HOME/INC-102-handoff.tar.gz"
 ```
 
-The symlink target must remain inside the repository; moving the project breaks it until relinked. Uninstalling the command does **not** automatically erase private incident evidence.
+The default Nginx collector runs an unprivileged configuration check. In WSL 2, `nginx -t` may report `permission_limited` due to `/run/nginx.pid`, even when Nginx is running; the snapshot correctly remains **partial**. Independently verify with `sudo nginx -t` if appropriate, but never run the entire toolkit as root.
 
-The runtime data is created at `~/.local/share/ubuntu-irt/`, unless `XDG_DATA_HOME` is set. Do **not** run `sudo ./bin/uir` and do **not** copy raw logs into this repository.
+## Opt-in diagnostic collectors
 
-## An end-to-end incident workflow
+All flags belong to `./bin/uir capture`, **not** standalone shell commands.
 
-The example ID `INC-007` describes a **simulated Nginx outage on a disposable VM**; actual remediation is deliberately manual.
+| Flag | Recorded observation | Important interpretation |
+| --- | --- | --- |
+| `--http-port 18080` | `http_probe` (GET `http://127.0.0.1:18080/` only) | HTTP 4xx/5xx is a valid observation; a network timeout is not a status code |
+| `--listen-port 18080` | `tcp_listener` with bound addresses | Host-level socket visibility, not process ownership |
+| `--expect-address 127.0.0.1` | Expected bind-address check | Requires `--listen-port`; supported loopback addresses are restricted |
+| `--fs-path /` | `filesystem`: containing mount capacity/inodes and target hash | Filesystem usage, **not directory size**; raw path omitted from snapshot |
+| `--dependencies` | `dependencies`: at most 8 direct `Requires=` units | Service profile only; observed state and ordering do not prove causality |
+| `--processes` | `processes`: up to 8 process names and resource measurements | `ps` CPU percentage is a **lifetime average**, not instantaneous CPU |
+| `--journal-audit` | `journal_audit`: scoped entry counts and transport summary | Service profile only; no entries observed does not prove failed logging |
+
+To check a saved snapshot:
 
 ```bash
-# 1. Open a case
-./bin/uir incident create --id INC-007 --service nginx --severity high \
-  --summary 'Simulated Nginx unavailable in the Ubuntu training lab'
-./bin/uir incident status --id INC-007 --value investigating
-
-# 2. Reproduce the isolated lab issue safely (separate VM exercise)
-#    Follow lab/incidents/INC-007.md; do NOT copy its fault commands into WSL.
-
-# 3. Capture bounded pre-fix evidence
-./bin/uir capture --incident INC-007 --phase before --minutes 15
-./bin/uir incident note --id INC-007 --kind hypothesis \
-  --text 'Hypothesis after inspecting actual unit and journal output'
-
-# 4. Manually repair the dedicated lab fault, following the runbook
-
-# 5. Record the outcome
-./bin/uir capture --incident INC-007 --phase after --minutes 15
-./bin/uir compare --incident INC-007
-./bin/uir incident note --id INC-007 --kind root_cause \
-  --text 'Replace with the confirmed cause backed by evidence'
-./bin/uir incident note --id INC-007 --kind verification \
-  --text 'Replace with observed nginx -t and curl results'
-./bin/uir incident status --id INC-007 --value resolved
-./bin/uir report --incident INC-007
-
-# 6. Find and safely hand off
-./bin/uir incident search --service nginx --text 'address already in use'
-./bin/uir export --incident INC-007 --preview
-./bin/uir export --incident INC-007 --output ./INC-007-handoff.tar.gz
+jq '{capture_status, collector_results, http_probe, tcp_listener, filesystem,
+     dependencies, processes, journal_audit}' \
+  "$HOME/.local/share/ubuntu-irt/incidents/INC-102/before/snapshot.json"
 ```
 
-Incident IDs must be unique (`INC-007`, `INC-008`, etc.). `before` and `after` snapshots are **immutable**. Repeating a lab means creating a new incident, not overwriting prior evidence.
+Use `./bin/uir --help` for the definitive installed syntax. Probe results appear as optional JSON objects; absent options are not silently tested.
 
-### Capture content
+## Private records, search and retention
 
 ```text
 ~/.local/share/ubuntu-irt/
-├── config/settings.json               # 0600
-└── incidents/                          # 0700
-    └── INC-007/                        # 0700
-        ├── incident.json              # incident metadata + operator notes
-        ├── before/
-        │   ├── snapshot.json          # structured UTC observations
-        │   ├── diagnostics.txt.gz      # bounded, locally redacted text
-        │   └── journal.jsonl.gz       # bounded, locally redacted journal
-        ├── after/ ...                  # same schema
-        ├── comparison.json            # observation-only delta summary
-        └── report.md                  # human-readable assessment
+├── config/settings.json
+└── incidents/INC-102/
+    ├── incident.json
+    ├── before/{snapshot.json,diagnostics.txt.gz,journal.jsonl.gz}
+    ├── after/{snapshot.json,diagnostics.txt.gz,journal.jsonl.gz}
+    ├── comparison.json
+    └── report.md
 ```
 
-Gzip is a portable and space-efficient default for repetitive logs; small JSON files remain uncompressed for easy inspection. The local store is kept **separate** from the public Git repository.
-
-### Searching and evidence retention
+The private incident store uses owner-only permissions. Its logs and reports **may still contain sensitive information** despite best-effort redaction; never commit the store into Git.
 
 ```bash
 ./bin/uir incident list
-./bin/uir incident show INC-007
-./bin/uir incident search --since 2026-11-01 --severity high
+./bin/uir incident show INC-102
 ./bin/uir incident search --text 'connection refused'
-
 ./bin/uir retention status
 ./bin/uir retention set --days 30 --max-storage-mb 500 --capture-max-mb 10
 ./bin/uir retention prune --dry-run
-# After inspecting exact deletion candidates:
+# Inspect all deletion candidates. Explicit confirmation only:
 ./bin/uir retention prune --yes
 ```
 
-Default policy: **30 days**, **500 MiB total managed incident storage**, **10 MiB per compressed capture**. There is **no automatic pruning** or silent deletion; exported archives have their own lifetime and are not removed by `retention prune`.
+Defaults are 30 days, 500 MiB managed incident storage and 10 MiB per compressed capture. Retention has **no background job**, and exported handoffs are outside its scope.
 
-## Secure, portable support handoff
+## Secure export and manual review
 
-`uir export --preview` lists the allowlisted contents without generating an archive. The export pipeline re-sanitizes text, packages selected metadata, available before/after evidence, comparison, an operator report and a **SHA-256 checksum manifest** into a `.tar.gz` file.
+`export --preview` performs safety checks without writing a handoff. The export process stages allowlisted files, applies public sanitization, enforces decoded-data bounds, generates a Markdown report from sanitized metadata and adds an internal SHA-256 manifest. Export refuses to overwrite an existing destination.
 
-After checking archive members and extracting only into a private review folder:
+**Hashes verify archive consistency, not authenticity or anonymity.** Check the member list for traversal/symlinks **before** extracting into a private empty directory; then verify checksums and manually inspect every text, JSON and decompressed journal/diagnostic file. Automated redaction is incomplete by design. **Do not publish real incident exports, internal hostnames, credentials or private logs.** See [security](docs/security.md) and [release checklist](docs/release-checklist.md).
 
-```bash
-(cd ~/uir-review && sha256sum -c SHA256SUMS)
-```
-
-**Integrity is not anonymity.** Automated redaction cannot reliably identify every credential, IPv6 address, customer name or subtle identifier. Inspect report, JSON and decompressed logs before making any archive public. Export never uploads files for you and refuses to overwrite existing destinations.
-
-## Testing and quality gates
+## Testing and evidence
 
 ```bash
 bash tests/run-all.sh
+printf 'Regression exit: %s\n' "$?"
 ```
 
-The suite is designed to run as a regular user. It includes syntax/optional lint checks, baseline smoke tests, Bats tests, insecure-path and duplicate protections, gzip round-trips, metadata persistence, comparison, search, redaction, safe archive hashes and non-destructive retention checks.
+The **November 14, 2026 WSL 2 acceptance run** reported **13/13 stages** and exit code `0`, including 28 original end-to-end integration checks, H01–H06 integration, and H07 archive-boundary/privacy tests. A subsequent log search showed only the runner's generic `SKIP` reminder, not an actual skipped-check line. This is **local automated acceptance**, not an independent penetration test or production certification. A clean checkout and manual release privacy review remain required. See [testing matrix](docs/testing.md).
 
-**Verified in the build container:** A synthetic end-to-end integration run passed 28 checks as of this candidate. This does **not** establish Ubuntu VM or service-remediation success. Individual tests and the count can change after further hardening; record the exact final run results in [`docs/testing.md`](docs/testing.md) rather than inventing performance statistics. ShellCheck, shfmt and Bats results must still be verified on the intended Ubuntu environment.
+## Incident scenarios
 
-## Incident lab catalog
+Twelve training scenarios were **exercised in WSL 2**, using isolated disposable units/services and explicit synthetic fixtures where warranted. They were **not** VirtualBox or production incidents. An operator's terminal screenshots showed before/after captures, reports, export verification and cleanup for the exercises; the original private evidence bundles are not included here.
 
-Twelve isolated or fixture-first training exercises, with separate step-by-step fault/diagnosis/repair/cleanup runbooks and troubleshooting KB drafts:
+| Scenario | Investigation focus | Reference KB |
+| --- | --- | --- |
+| INC-001 | Failed systemd `ExecStart` | [KB-001](docs/kb/KB-001.md) |
+| INC-002 | Isolated SSH configuration error | [KB-002](docs/kb/KB-002.md) |
+| INC-003 | Nginx content file permissions | [KB-003](docs/kb/KB-003.md) |
+| INC-004 | APT lock message **(synthetic fixture)** | [KB-004](docs/kb/KB-004.md) |
+| INC-005 | Bounded CPU workload; non-causal load samples | [KB-005](docs/kb/KB-005.md) |
+| INC-006 | Capped `tmpfs` exhaustion | [KB-006](docs/kb/KB-006.md) |
+| INC-007 | Invalid Nginx configuration | [KB-007](docs/kb/KB-007.md) |
+| INC-008 | Reverse proxy upstream unavailable | [KB-008](docs/kb/KB-008.md) |
+| INC-009 | Isolated DNS timeout | [KB-009](docs/kb/KB-009.md) |
+| INC-010 | Loopback address reachability / synthetic firewall evidence | [KB-010](docs/kb/KB-010.md) |
+| INC-011 | Discarded application stdout/stderr | [KB-011](docs/kb/KB-011.md) |
+| INC-012 | Required systemd dependency failure | [KB-012](docs/kb/KB-012.md) |
 
-| Incident | Focus | Runbook | KB |
-| --- | --- | --- | --- |
-| INC-001 | systemd ExecStart failure | [Lab](lab/incidents/INC-001.md) | [KB](docs/kb/KB-001.md) |
-| INC-002 | Secondary SSH configuration failure | [Lab](lab/incidents/INC-002.md) | [KB](docs/kb/KB-002.md) |
-| INC-003 | Web file permissions | [Lab](lab/incidents/INC-003.md) | [KB](docs/kb/KB-003.md) |
-| INC-004 | Package lock diagnostics (fixture-first) | [Lab](lab/incidents/INC-004.md) | [KB](docs/kb/KB-004.md) |
-| INC-005 | Bounded CPU load | [Lab](lab/incidents/INC-005.md) | [KB](docs/kb/KB-005.md) |
-| INC-006 | Capped tmpfs disk exhaustion | [Lab](lab/incidents/INC-006.md) | [KB](docs/kb/KB-006.md) |
-| INC-007 | Nginx invalid configuration | [Lab](lab/incidents/INC-007.md) | [KB](docs/kb/KB-007.md) |
-| INC-008 | Nginx upstream 502 | [Lab](lab/incidents/INC-008.md) | [KB](docs/kb/KB-008.md) |
-| INC-009 | DNS lookup failure (fixture-first) | [Lab](lab/incidents/INC-009.md) | [KB](docs/kb/KB-009.md) |
-| INC-010 | Firewall rule behavior (fixture-first) | [Lab](lab/incidents/INC-010.md) | [KB](docs/kb/KB-010.md) |
-| INC-011 | Journal unit vs tag selection | [Lab](lab/incidents/INC-011.md) | [KB](docs/kb/KB-011.md) |
-| INC-012 | systemd missing dependency | [Lab](lab/incidents/INC-012.md) | [KB](docs/kb/KB-012.md) |
+See the [evidence-status tracker](docs/incidents/STATUS.md) for the exact scope and outstanding verification limits. Historical plans in `docs/planning/` and early milestone notes capture decisions made **before** the WSL 2 execution strategy; they are not current release-status statements.
 
-**Status:** All twelve lab **runbooks are drafted, not yet executed**. After hands-on exercises, actual evidence and results belong in [the incident execution tracker](docs/incidents/STATUS.md) and individual case-study records based on the [template](docs/incidents/TEMPLATE.md). A fictional RCA is not acceptable portfolio evidence.
+## Security and limitations
 
-## Security by design
+UIR is local and user-invoked: **no `sudo` inside the CLI, auto-remediation, telemetry, remote collection, background monitoring, dashboard or GUI**. It cannot guarantee complete journal visibility, accurate attribution of resource spikes, identification of every secret, race-free handling against a hostile same-UID process, or native-VM behavior from WSL-only tests.
 
-- **Least privilege:** regular-user CLI; no implicit `sudo`.
-- **Controlled scope:** allowlisted services, recent journal window, timeouts, byte bounds, no arbitrary command execution.
-- **Private evidence:** owner-only files/directories, validated IDs/paths, no state in the Git checkout.
-- **Traceable records:** UTC timestamps and explicit `partial` versus `complete` collector outcome.
-- **Defensive archives:** explicit membership, sanitized staging, SHA-256 digests, no overwriting existing output.
-- **Deletion requires confirmation:** per-user retention with `--dry-run` and `--yes`.
+For responsible use see [SECURITY.md](SECURITY.md), [security model](docs/security.md), [contributing](CONTRIBUTING.md), and [operator guide](docs/operations.md).
 
-**Known limitations:** Bash filesystem checks are not atomic security boundaries against a hostile process acting as the same UNIX user. Human audit remains mandatory because regex-based redaction is not comprehensive. The service profile does not guarantee it captures every application port or end-to-end request. Live journal access varies by host, and WSL behavior differs from a full Ubuntu VM. More details: [security model](docs/security.md).
+## License and release status
 
-## Engineering decisions and roadmap
-
-- **Bash + jq**: inspectable on Ubuntu, no heavyweight runtime or daemon.
-- **JSON / gzip**: schema-driven records plus portable compressed evidence.
-- **Read-only diagnostics first**: the tool never performs risky repair commands, only a human following a safe runbook can do that.
-- **No dashboard in v1**: the CLI and evidence model must be trustworthy before adding a GUI.
-- **No invented business outcomes**: resume claims are held until verified lab and test evidence exists.
-
-After VM acceptance, optional v1.1 may explore opt-in, rate-limited systemd-triggered capture; v2 may add a local GUI/data-access API. This is a plan, **not a feature claim**.
-
-## Project structure
-
-```text
-bin/uir                  Bash entry point
-lib/                     CLI, validation, collectors, store, comparison,
-                         search, report, export, sanitizer, retention
-tests/                   Bats, smoke, seeded fixtures, full integration checks
-lab/setup/               Ubuntu VM and WSL instructions
-lab/incidents/           12 reproduction and rollback runbooks
-docs/kb/                 12 knowledge-base articles
-docs/incidents/          Case-study template and honest execution tracker
-docs/                    Architecture, operations, security, testing
-config/                  Settings examples (not executable configuration)
-examples/sanitized/       Explicitly synthetic demonstration data
-Makefile                  Optional developer targets
-.github/workflows/       CI definition for eventual publication
-```
-
-## Contribution, license and authenticity
-
-The source is released under the [MIT License](LICENSE). See [CONTRIBUTING.md](CONTRIBUTING.md) for safety expectations. If you encounter a sensitive-data vulnerability, follow [SECURITY.md](SECURITY.md).
-
-This project is built as a learning-focused technical portfolio artifact. It demonstrates design, engineering, testing and documentation decisions. **A successful mock incident never substitutes for genuine production support experience.** Claims in a future CV should be supported by actual reproducible test reports and VM observations.
+[MIT License](LICENSE). Maintained as a learning and engineering portfolio project; **not affiliated with Canonical**. Version in `lib/config.sh` remains `1.0.0-rc1` until the final clean-checkout and privacy gates are approved. The planned v1.0.0 tag and GitHub publication are **not yet claimed**.

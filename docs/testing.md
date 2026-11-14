@@ -1,29 +1,63 @@
-# Verification matrix and release gates
+# Testing matrix, evidence and release gates
 
-## Automated tests, without a VM outage
+**Current code status:** v1.0.0-rc1. **Target:** Ubuntu 24.04 LTS. **Executed host:** Ubuntu 24.04 under WSL 2. **Not tested:** native Ubuntu Server or Oracle VirtualBox installation, adversarial multi-user evidence custody, production workloads.
 
-Run from the repository root **as a non-root user**:
+## Automated tests
+
+Run as a **regular user** from the repository root:
 
 ```bash
-bash tests/run-all.sh
+bash tests/run-all.sh 2>&1 | tee "$HOME/uir-final-regression.log"
+printf 'Runner exit: %s\n' "${PIPESTATUS[0]}"
 ```
 
-The runner performs syntax, available ShellCheck and shfmt checks, portable smoke tests, Bats tests if installed, M3 store regression tests, v1 end-to-end integration, and seeded redaction fixtures. The integration suite creates an isolated `XDG_DATA_HOME` and removes only its temporary test data. It does NOT induce system service failures.
+The 13 runner stages, as observed in the November 14, 2026 WSL acceptance output, comprise:
 
-## Host integration gates (Ubuntu 24.04 VM)
+| Stage | Coverage |
+| --- | --- |
+| 1 | Bash syntax |
+| 2 | ShellCheck warnings (must be installed for a real check) |
+| 3 | shfmt four-space formatting (must be installed for a real check) |
+| 4 | Portable smoke tests |
+| 5 | Bats unit tests (must be installed for a real check) |
+| 6 | Store, end-to-end workflow, seeded redaction (28 baseline integration checks) |
+| 7 | H01 HTTP probe behavior and failure classification |
+| 8 | H02 TCP listening/binding diagnostics |
+| 9 | H03 filesystem and inode diagnostics, including WSL `ext2/ext3` label |
+| 10 | H04 systemd direct `Requires=` dependencies, including `.slice` and `.target` |
+| 11 | H05 bounded process inspection and failure classification |
+| 12 | H06 scoped journal metadata and empty/error windows |
+| 13 | H07 decoded gzip boundary, structured export privacy and comparison correctness |
 
-| Gate | Evidence to record | Outcome status |
+**Observed outcome (user-provided WSL terminal output, 2026-11-14):** 13/13 stages reached, overall exit `0`; H07 and the preceding integration stages passed. A grep for `SKIP` returned only the runner's generic reminder line. Before release, examine the *entire* log to confirm ShellCheck/shfmt/Bats truly executed and did not print a tool-specific skip; a zero exit by itself is not proof those optional tools ran.
+
+To detect actual skips:
+
+```bash
+grep -nEi '^[[:space:]]*(SKIP|SKIPPED)(:|[[:space:]]|$)|^\[SKIP\]' \
+  "$HOME/uir-final-regression.log" || echo 'No explicit test skips found'
+```
+
+## Manual acceptance matrix
+
+| Gate | Evidence | Current state |
 | --- | --- | --- |
-| VM boot, console and restore | VirtualBox snapshot `CLEAN-BASELINE`, observed restore | Not yet user-verified |
-| Environment preflight | `./bin/uir doctor` on VM | Not yet user-verified |
-| Service availability | `systemctl status nginx ssh.socket ssh.service` | Not yet user-verified |
-| Core host capture | Host snapshot consistent with `free`, `df`, `ss`, `ip` output | Not yet user-verified |
-| Before/after Nginx outage | Nginx failure and recovery as per INC-007 | Not yet user-verified |
-| Functional verification | `nginx -t`, `curl`, expected port/listener | Not yet user-verified |
-| Export privacy | Inspect all members and verify seeded redaction | Automated fixture pass; VM acceptance pending |
-| Incident catalog | Real `before`, `after`, RCA, KB evidence for twelve scenarios | Not yet executed |
-| Fresh install | Clean VM checkout and full smoke tests | Not yet user-verified |
+| WSL environment and preflight | `doctor`, service/network utilities | Verified by operator in WSL 2 |
+| Twelve exercise scenarios | Private before/after records, notes and screenshots | Reported exercised in WSL 2; mixed isolated live simulations and synthetic fixtures |
+| H01 live HTTP probe | INC-013 timeout and local recovery | User-provided snapshots and cleanup screenshots; preserve original private evidence |
+| H02 socket checks | Offline/listening/wrong binding | Automated fixtures passed on WSL 2 |
+| H03 live filesystem | INC-014 capacity/inode fields | Observed, capture complete |
+| H04 live dependency inspection | INC-016, 2/2 active dependencies, collector exit 0 | Observed; overall capture partial due to Nginx permission limit |
+| H05 live process inspection | INC-017, 8 process records, collector exit 0 | Observed; process sampler artifact corrected in later code |
+| H06 live journal visibility | INC-018, 0 records in 5 min, collector exit 0 | Observed; overall capture partial due to Nginx permission limit |
+| H07 archive/privacy regression | Concatenated gzip rejection, redaction and hashes | Automated WSL pass; external manual sharing review still required |
+| Native Ubuntu / VirtualBox | Dedicated platform smoke/recovery | **Not performed**; do not claim |
+| Clean checkout installation | Fresh clone, dependencies, quickstart, all checks | **Pending final release gate** |
+| Final staged Git diff and secret scan | Reviewed file list and staged changes | **Pending final release gate** |
+| Documentation consistency, release tag | Correct CLI version, links and changelog | **Pending final release gate** |
 
-## Release criteria
+The operator screenshots do not replace preserved private raw evidence; no real incident archives should be added to Git. See [status tracker](incidents/STATUS.md) for the distinction between live and synthetic exercises.
 
-The user decides to publish after the VM tests, case-study results and a final manual privacy audit. This candidate is a feature-complete **implementation draft**, not a claim that the twelve lab demonstrations, ShellCheck/shfmt or production readiness have been verified. Do not turn provisional resume bullets into factual achievements until each result has supporting evidence.
+## Release policy
+
+Publish `v1.0.0` only after the [release checklist](release-checklist.md) is satisfied, the on-machine test log has been reviewed, the code version is updated from `1.0.0-rc1`, and the operator approves the staged Git diff. A successful simulation or automated regression does **not** constitute a production SLA, formal penetration test, or native Ubuntu validation.

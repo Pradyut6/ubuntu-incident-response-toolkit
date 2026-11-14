@@ -19,6 +19,18 @@ source "$UIR_PROJECT_ROOT/lib/sanitize.sh"
 source "$UIR_PROJECT_ROOT/lib/collect_host.sh"
 # shellcheck source=../lib/collect_service.sh
 source "$UIR_PROJECT_ROOT/lib/collect_service.sh"
+# shellcheck source=../lib/collect_http.sh
+source "$UIR_PROJECT_ROOT/lib/collect_http.sh"
+# shellcheck source=../lib/collect_tcp.sh
+source "$UIR_PROJECT_ROOT/lib/collect_tcp.sh"
+# shellcheck source=../lib/collect_filesystem.sh
+source "$UIR_PROJECT_ROOT/lib/collect_filesystem.sh"
+# shellcheck source=../lib/collect_dependencies.sh
+source "$UIR_PROJECT_ROOT/lib/collect_dependencies.sh"
+# shellcheck source=../lib/collect_processes.sh
+source "$UIR_PROJECT_ROOT/lib/collect_processes.sh"
+# shellcheck source=../lib/collect_journal_audit.sh
+source "$UIR_PROJECT_ROOT/lib/collect_journal_audit.sh"
 # shellcheck source=../lib/capture.sh
 source "$UIR_PROJECT_ROOT/lib/capture.sh"
 # shellcheck source=../lib/search.sh

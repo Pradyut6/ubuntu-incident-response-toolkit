@@ -90,3 +90,30 @@ uir::validate::profile() {
     *) return 1 ;;
     esac
 }
+
+# Filesystem probes accept an existing, canonical directory only. No wildcard,
+# symlink component, control character or non-ASCII path is accepted. The
+# measured path is hashed before storage; this is not an atomic race guard.
+uir::validate::filesystem_path() {
+    local input="$1" canonical
+    if ((${#input} < 1 || ${#input} > 384)) ||
+        [[ ! "$input" =~ ^/[a-zA-Z0-9._/-]*$ ]] ||
+        [[ "$input" != / && "$input" == */ ]] ||
+        [[ ! -d "$input" || -L "$input" ]]; then
+        uir::error 'filesystem path must be an existing canonical absolute directory'
+        return 2
+    fi
+    canonical="$(realpath -e -- "$input" 2>/dev/null)" || return 2
+    if [[ "$canonical" != "$input" ]]; then
+        uir::error 'filesystem path must not contain symlinks, dot or traversal components'
+        return 2
+    fi
+}
+
+# Allow only conventional, bounded systemd unit names returned from Requires=.
+# No paths, shell metacharacters, leading option markers or escaped unit names.
+uir::validate::dependency_unit() {
+    ((${#1} >= 1 && ${#1} <= 128)) &&
+        [[ "$1" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.@:-]*\.(service|socket|target|mount|timer|path|slice)$ ]] &&
+        [[ "$1" != *'..'* ]]
+}

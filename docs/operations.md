@@ -1,86 +1,97 @@
-# Operator handbook — complete v1 CLI journey
+# Operator handbook — Ubuntu Incident Response Toolkit
 
-## Environment and safety
+This handbook describes the **current H01–H07 CLI**, not the historical VirtualBox-first design. UIR targets Ubuntu 24.04 LTS and has been exercised on Ubuntu 24.04 under WSL 2. All collection commands are read-only and should be run as a regular user.
 
-Use Ubuntu Server 24.04 LTS on VirtualBox. First establish console access, NAT networking, Nginx and OpenSSH, then take a `CLEAN-BASELINE` VM snapshot. WSL is fine for read-only development/testing but deliberately breaking Nginx, SSH, disk or firewall services there can affect your main workflow. Store evidence under the Linux home folder, not a Windows-mounted path.
-
-Install dependencies:
+## 1. Preflight
 
 ```bash
-sudo apt update
-sudo apt install -y jq gzip tar coreutils iproute2 curl nginx openssh-server shellcheck shfmt bats
+./bin/uir --version
 ./bin/uir doctor
-```
-
-For files extracted from a ZIP into your project folder, set executable bit once: `chmod +x bin/uir`.
-
-## One incident from start to finish
-
-```bash
-# In a disposable Ubuntu VM (never a production host)
 ./bin/uir init
-./bin/uir incident create --id INC-007 --service nginx --severity high \
-  --summary 'Simulated Nginx outage in isolated lab'
-./bin/uir incident status --id INC-007 --value investigating
-# Follow the read-only preflight and isolated fault exercise in lab/incidents/INC-007.md
-./bin/uir capture --incident INC-007 --phase before --minutes 15
-./bin/uir incident note --id INC-007 --kind hypothesis --text 'Hypothesis based on actual output'
-# Restore the dedicated test config by following the incident's recovery step
-./bin/uir capture --incident INC-007 --phase after --minutes 15
-./bin/uir compare --incident INC-007
-./bin/uir incident note --id INC-007 --kind root_cause --text 'Confirmed cause from recorded evidence'
-./bin/uir incident note --id INC-007 --kind remediation --text 'Exact manual fix and risk'
-./bin/uir incident note --id INC-007 --kind verification --text 'Observed functional test outcome'
-./bin/uir incident status --id INC-007 --value resolved
-./bin/uir report --incident INC-007
-./bin/uir incident search --service nginx --text 'nginx'
-./bin/uir export --incident INC-007 --preview
-./bin/uir export --incident INC-007 --output ./INC-007-handoff.tar.gz
+./bin/uir --help
 ```
 
-A `partial` capture is **not** an error-free success: inspect `collector_results` and decompress diagnostics with `gzip -cd ~/.local/share/ubuntu-irt/incidents/INC-007/before/diagnostics.txt.gz`. An inaccessible journal may yield empty `journal.jsonl.gz`; do not invent records. Each phase is immutable; create a distinct incident for repeat exercises rather than overwriting evidence.
+If prerequisites are missing on Ubuntu, install the relevant packages (`jq`, `coreutils`, `tar`, `gzip`, `iproute2`, `curl`, `procps`; for development: `shellcheck`, `shfmt`, `bats`, `python3`). The tool does not create or change a systemd service. Use `sudo` **only** for separately reviewed manual administration—not for `./bin/uir`.
 
-## Search and notes
+The private store is `${XDG_DATA_HOME:-$HOME/.local/share}/ubuntu-irt`. Do **not** place it under `/mnt/c` or commit it. Normal development may be performed on WSL 2; systemd service experiments must use **disposable named units or isolated servers**, and DNS, firewall and package-lock failures should be represented by safe fixtures rather than changes to the main environment.
 
-- `uir incident list` and `uir incident show INC-007` validate persistent records.
-- `uir incident search --id INC-007 --since 2026-11-01 --severity high` combines structured filters.
-- `uir incident search --text 'address already in use'` performs literal case-insensitive search against JSON metadata and captured bounded gzip files. The search string is never treated as a shell command.
-- Notes use kinds `hypothesis`, `root_cause`, `remediation`, `verification`, or `customer_update`; their timestamps are UTC.
-
-## Retention
-
-Default: **30 days**, **500 MiB managed incident store**, **10 MiB per compressed capture**. These are best-effort local bounds; quotas are checked before publication and have documented race limitations. User controls:
+## 2. Case lifecycle and immutable evidence
 
 ```bash
+./bin/uir incident create --id INC-201 --service host --severity low \
+  --summary 'Read-only WSL host inspection'
+./bin/uir incident status --id INC-201 --value investigating
+./bin/uir capture --incident INC-201 --phase before --minutes 5 \
+  --fs-path / --processes
+./bin/uir incident note --id INC-201 --kind hypothesis \
+  --text 'Hypothesis pending further evidence'
+# Perform only an independently reviewed, isolated intervention if needed.
+./bin/uir capture --incident INC-201 --phase after --minutes 5 \
+  --fs-path / --processes
+./bin/uir compare --incident INC-201
+./bin/uir incident note --id INC-201 --kind verification \
+  --text 'State the check actually performed and its result'
+./bin/uir incident status --id INC-201 --value resolved
+./bin/uir report --incident INC-201
+```
+
+Replace `INC-201` with an unused ID. Each phase is immutable; another rehearsal requires a *new* incident. A host-only profile does not query an unrestricted journal.
+
+## 3. Optional collectors and output keys
+
+| Capture flag | Output key | Constraint / caveat |
+| --- | --- | --- |
+| `--http-port 18080` | `.http_probe` | Only `http://127.0.0.1:18080/`, `GET /`; no bodies or redirect-following; timeout is an outcome, not an HTTP status |
+| `--listen-port 18080 --expect-address 127.0.0.1` | `.tcp_listener` | Socket binds are host-level, not an application ownership test; expected address requires port |
+| `--fs-path /` | `.filesystem` | Contains mount capacity and inode usage; selected directory path fingerprinted |
+| `--dependencies` | `.dependencies` | Allowed service profile only; at most 8 direct `Requires=` dependencies |
+| `--processes` | `.processes` | Up to 8 processes, names without args; `ps` CPU is lifetime-average |
+| `--journal-audit` | `.journal_audit` | Allowed service profile only; count/transport metadata; empty window does not prove broken logging |
+
+Probe flags are optional and can be combined. If both phases do not use comparable targets, the corresponding comparison flag should be false or null. Do not treat a change in one-minute host load or a process's `ps` CPU percentage as proof of remediation.
+
+```bash
+SNAP="$HOME/.local/share/ubuntu-irt/incidents/INC-201/before/snapshot.json"
+jq '{capture_status,collector_results,filesystem,processes}' "$SNAP"
+```
+
+**Nginx permission note:** On WSL 2, an ordinary-user `nginx -t` may fail because opening `/run/nginx.pid` requires elevated privileges. The collector correctly records `permission_limited`, making the overall snapshot `partial`. Check `collector_results` and `diagnostics.txt.gz`; verify separately with `sudo nginx -t` when justified. Never change `/run/nginx.pid` permissions to suppress the warning.
+
+## 4. Search, notes, retention
+
+```bash
+./bin/uir incident list
+./bin/uir incident show INC-201
+./bin/uir incident search --since 2026-11-01 --text 'connection refused'
 ./bin/uir retention status
-./bin/uir retention set --days 45 --max-storage-mb 600 --capture-max-mb 8
+./bin/uir retention set --days 30 --max-storage-mb 500 --capture-max-mb 10
 ./bin/uir retention prune --dry-run
-# Only after carefully reading its plan:
+# Manually inspect the candidate list before this destructive action:
 ./bin/uir retention prune --yes
 ```
 
-Pruning removes expired incident folders and, when over the configured quota, the oldest additional folders. The tool **never automatically** deletes incident evidence or external handoff archives. Unlike snapshots, retention commands deliberately change the private incident store; read the dry-run output and preserve important archives first.
+Pruning acts only on eligible private incident records and is never scheduled. Exported handoffs are not managed by retention.
 
-## Export verification
+## 5. Redacted handoff and integrity
 
 ```bash
-mkdir -p ~/uir-review
-# Extract ONLY this archive that you created and whose entry list you reviewed.
-tar -tzf ./INC-007-handoff.tar.gz
-# Check that there are no absolute, traversal or symlink members first.
-tar -xzf ./INC-007-handoff.tar.gz -C ~/uir-review
-(cd ~/uir-review && sha256sum -c SHA256SUMS)
-find ~/uir-review -type f -maxdepth 3 -print
+./bin/uir export --incident INC-201 --preview
+./bin/uir export --incident INC-201 --output "$HOME/INC-201-handoff.tar.gz"
 ```
 
-The checksum verifies transfer integrity, **not redaction completeness**. Review `report.md`, JSON and decompressed logs for secret types not covered by regexes before making the archive public. Don't upload raw evidence to GitHub.
+Before extracting: inspect `tar -tvzf "$HOME/INC-201-handoff.tar.gz"` for unexpected entries, paths and links; only review archives you created or otherwise trust. Use an empty private directory with `0700` mode and verify `sha256sum -c SHA256SUMS` inside it. The hashes demonstrate content consistency, **not provenance or redaction completeness**. Review *all* JSON, Markdown and decompressed text manually. Don't publish private real incident exports.
 
-## Failure handling
+## 6. Troubleshooting
 
-- **Missing `jq`**: install `jq`, rerun `doctor`; metadata commands return exit code 3.
-- **Partial collector / empty journal**: inspect stored JSON, confirm systemd availability, journal group membership or guest permissions; never run the whole CLI as root.
-- **Unsupported service profile**: create incidents for `host`, `nginx`, `ssh` or a disposable `uir-*` unit. New profiles require code review and tests.
-- **Filesystem mode error**: move the data store onto a native Linux filesystem. Never blindly `chmod -R` unrelated paths.
-- **Gzip corrupted**: copy evidence to a safe private backup for analysis; the tool refuses to export it.
-- **Export already exists**: provide a different safe filename; overwrite is intentionally denied.
-- **Snapshot already exists**: preserve it. Use a new incident ID to repeat the exercise.
+| Symptom | Response |
+| --- | --- |
+| `expected a real private directory` | Call `uir init` if needed, then `incident create`; never hand-create incident directories |
+| `snapshot already exists` | This phase is immutable. Keep it, choose a fresh incident ID for a new exercise |
+| `unexpected capture argument` | Verify installer/CLI version, use flags as part of `uir capture`, not standalone commands |
+| `partial` capture | Inspect `.collector_results` and compressed diagnostic warnings; do not overwrite status |
+| Nginx `permission_limited` | Verify with separately authorized `sudo nginx -t`, not root `uir` |
+| Unsupported service profile | Only `host`, `nginx`, `ssh`, `ssh.socket`, and validated disposable `uir-*` profiles |
+| Gzip corruption / unsafe path | Preserve evidence privately, investigate; do not bypass validation or force export |
+| Export already exists | Choose another safe destination; overwriting is deliberately refused |
+
+For more detail see [architecture](architecture.md), [testing](testing.md), [security](security.md), and [incident execution tracker](incidents/STATUS.md).

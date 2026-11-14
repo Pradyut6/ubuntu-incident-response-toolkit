@@ -49,8 +49,41 @@ uir::collect::service() {
       active_enter_timestamp:$since,fragment_path:$fragment,listening_default_ports:$ports}' >"$json" || return 5
     uir::collect::run "systemctl show $unit" "$diagnostics" systemctl show "$unit" \
         --property=Id,LoadState,ActiveState,SubState,Result,FragmentPath,ActiveEnterTimestamp || status=1
-    if [[ "$unit" == nginx.service ]] && command -v nginx >/dev/null 2>&1; then
-        uir::collect::run 'nginx -t (no changes)' "$diagnostics" nginx -t || status=1
+    if [[ "$unit" == nginx.service ]]; then
+        local config_status=unavailable config_exit=127 start_byte tmp
+
+        if command -v nginx >/dev/null 2>&1; then
+            start_byte="$(wc -c <"$diagnostics")"
+
+            if uir::collect::run 'nginx -t (no changes)' "$diagnostics" nginx -t; then
+                config_status=passed
+                config_exit=0
+            else
+                config_exit=$?
+                config_status=failed
+
+                if tail -c "+$((start_byte + 1))" "$diagnostics" |
+                    grep -Eiq 'permission denied|operation not permitted'; then
+                    config_status=permission_limited
+                    printf '%s\n' '[UIR WARNING] Nginx configuration check is permission-limited.' '[UIR WARNING] Verify separately with sudo nginx -t; do not run the toolkit with sudo.' >>"$diagnostics"
+                fi
+                status=1
+            fi
+        else
+            status=1
+        fi
+
+        tmp="$(mktemp "${json}.XXXXXX")" || return 5
+
+        if jq --arg check "$config_status" --argjson exitcode "$config_exit" '. + {configuration_check: {status: $check, exit: $exitcode}}' "$json" >"$tmp"; then
+            mv -f -- "$tmp" "$json" || {
+                rm -f -- "$tmp"
+                return 5
+            }
+        else
+            rm -f -- "$tmp"
+            return 5
+        fi
     fi
     if [[ "$unit" == ssh.service || "$unit" == ssh.socket ]]; then
         uir::collect::run 'ssh.socket status' "$diagnostics" systemctl show ssh.socket \

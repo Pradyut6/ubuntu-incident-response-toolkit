@@ -1,39 +1,44 @@
-# Working on the toolkit in WSL — developer notes
+# Development and safe incident exercises on WSL 2
 
-The screenshot-based development environment is **Ubuntu 24.04 running under WSL** with the repository at `/mnt/c/Users/.../Downloads/ubuntu-incident-response-toolkit`. The successful smoke/Bats tests validate the initial CLI, but they do **not** validate VirtualBox isolation or the full Ubuntu server incident lab.
+The toolkit was developed and tested using **Ubuntu 24.04 under WSL 2**. The training exercises used purpose-built local services, capped tmpfs mounts, short bounded workloads and synthetic fixtures. **No Oracle VirtualBox VM acceptance was performed.** This page replaces earlier VirtualBox-first operational advice; historical plans remain in `docs/planning/`.
 
-## Recommended safe arrangement
+## Repository and private data
 
-Use WSL for normal Bash development, static analysis, metadata testing and non-disruptive collectors. Keep a separate **Ubuntu Server 24.04 VirtualBox VM** for reproducing Nginx, SSH, firewall, network or disk failures. Create a clean VM snapshot before all intentional faults.
-
-Prefer keeping the Git working tree on a Linux filesystem:
+Work from the **existing repository**, whether it resides under a Windows-mounted development directory or a Linux home project directory. Do not create an extra version directory just to run tests. For a future migration, adjust `<windows-user>` to your own user name:
 
 ```bash
-mkdir -p ~/projects
-cp -a /mnt/c/Users/DSC/Downloads/ubuntu-incident-response-toolkit ~/projects/
-cd ~/projects/ubuntu-incident-response-toolkit
+# Optional future migration, NOT required for WSL validation:
+# mkdir -p "$HOME/projects"
+# cp -a "/mnt/c/Users/<windows-user>/Downloads/ubuntu-incident-response-toolkit" "$HOME/projects/"
+# cd "$HOME/projects/ubuntu-incident-response-toolkit"
 ```
 
-The path above follows the shared screenshot; **adjust the Windows username/location if your directory differs**. Working in `~/projects` typically yields better Linux metadata/permissions and I/O behavior than working under `/mnt/c`.
-
-The default incident store is already in the Linux home directory:
+The **private runtime data is different from the source checkout**. It must be stored in the Linux home filesystem:
 
 ```bash
-printf 'XDG_DATA_HOME=%s\n' "${XDG_DATA_HOME:-<not set>}"
+printf 'XDG_DATA_HOME=%s\n' "${XDG_DATA_HOME:-<unset>}"
 ./bin/uir init
+# Default: ~/.local/share/ubuntu-irt
 ```
 
-If `XDG_DATA_HOME` is unset, the store is `~/.local/share/ubuntu-irt`. **Do not set it to `/mnt/c/...`**: Windows-mounted permission semantics may not provide reliable `0700`/`0600` guarantees. The toolkit refuses nonprivate modes when it can detect them, but permission displays alone do not prove secure Windows ACLs.
+Avoid pointing `XDG_DATA_HOME` at `/mnt/c`: POSIX permissions and ownership can behave differently on DrvFS. Do not add real incident evidence to the Git repository.
 
-## Read-only checks
+## Safe validation
 
 ```bash
 ./bin/uir doctor
-bash tests/smoke.sh
-bash tests/integration/m3-store.sh
-bats tests/unit
+bash tests/run-all.sh
+./bin/uir incident list
 ```
 
-A WSL warning from `doctor` is deliberate. A successful `journalctl` invocation alone does not prove a full native Ubuntu server logging environment. Test systemd journal visibility and service-specific collection later in the isolated VirtualBox guest.
+The automated tests use disposable state and fixtures. For manual examples, only operate on uniquely named `uir-training-*` systemd units or isolated localhost servers, and confirm ownership and cleanup preconditions before removing resources. Captures themselves are read-only; **setup/cleanup scripts are not** and require careful review before execution.
 
-**Do not execute future incident fault-injection scripts under WSL.** They may affect WSL networking, distro availability or other workloads on the development PC.
+- **Do not** alter the primary WSL firewall, DNS resolver, APT database or filesystem capacity to simulate an incident.
+- Use synthetic APT-lock and firewall-denial log lines rather than causing real system-wide failures.
+- For disk-full demonstrations, use a separately mounted, tiny tmpfs; verify the exact mount and unmount it safely afterward.
+- Preserve before/after incident snapshots, checksum results and explicit cleanup evidence outside the repository. The case-study tracker records what was actually observed.
+- A permission-limited unprivileged Nginx test should remain a `partial` capture; check separately with `sudo nginx -t` if justified, not `sudo ./bin/uir`.
+
+## Scope of the evidence
+
+On November 14, 2026 the operator's WSL 2 regression suite reached **13/13 stages** with exit `0`. These are local test results, **not native Ubuntu/VirtualBox certification or evidence of production outages**. See [`docs/testing.md`](../../docs/testing.md), [`docs/incidents/STATUS.md`](../../docs/incidents/STATUS.md) and the [release checklist](../../docs/release-checklist.md).

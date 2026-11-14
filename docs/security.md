@@ -1,26 +1,33 @@
-# Security model, threat boundaries and responsible use
+# Security model, trust boundaries and responsible use
 
-The toolkit is a **training/portfolio incident-response aid**, not a certified forensic tool. It is meant for a disposable Ubuntu 24.04 VM and local support investigations. Never execute a fault-injection runbook against a host, WSL development distro, school/work system or customer environment.
+UIR is a **local training and support-triage aid**, not a certified forensic instrument, enterprise SIEM or malware-resistant evidence store. The primary development and validation environment was **Ubuntu 24.04 under WSL 2** using disposable units and synthetic fixtures. Do not run fault injection against production, a school/work host, or your primary WSL networking/firewall/package database.
 
-## Defaults
+## Security defaults
 
-- Run the CLI **without sudo**. The VM operator may perform manual `sudo` fixes following a reviewed lab procedure; the CLI never automatically repairs services.
-- The store must be on a trusted Linux filesystem (`0700` directories, `0600` files); not on DrvFS (`/mnt/c`) or a shared Windows folder where UNIX ownership semantics may differ.
-- IDs, unit/profile names, status fields, severities, lengths, dates and integer settings are validated. Logs and search text are treated as data; command text in messages is never executed.
-- Host and service probes are bounded by timeouts and resource limits. The journal query is scoped to an allowlisted systemd unit (not full `/var/log`). The special `host` profile deliberately records no system journal.
-- `uir init` and `incident create` make only private application files. `capture` adds private evidence; `report`, `compare` and export stage local files. The core does not change systemd configuration, firewall rules or permissions outside its own data root.
-- Logs are stored as `gzip` text and JSON for portability. Compression saves space for typical repetitive logs but provides no guarantee of an exact compression ratio.
-- Export redaction removes selected tokens, common cloud access-key shapes, emails, IPv4 addresses, home usernames and PEM private key boundaries. It is best effort; secrets in unusual formats, IPv6, embedded binary blobs, full private keys, and sensitive context may remain. **Manually inspect every export before publishing.**
-- No telemetry, network upload, credentials collection, automatic failure-triggered monitoring, auto-repair, web server or GUI.
+- Run `./bin/uir` as a **regular user**. The CLI never escalates privileges, changes systemd unit files, or performs automatic remediation.
+- Keep `$XDG_DATA_HOME/ubuntu-irt` (or `~/.local/share/ubuntu-irt`) on a trusted **Linux filesystem**. Private directories use `0700` and files `0600`, with validation for unsafe paths and symbolic links. Do not use `/mnt/c` for runtime evidence; Windows ACL semantics differ.
+- Use strictly validated incident IDs, services, integers, time windows, directory targets and supported loopback values. No `eval` of user-controlled text or arbitrary probe URLs.
+- Host-only captures do not execute unrestricted journal queries. Service journals are unit-scoped, bounded by time and line count; the extra H06 audit stores **counts and metadata**, not the `MESSAGE` field.
+- HTTP probes are loopback-only and discard response bodies; TCP probes observe sockets without binding them to a claimed process. H03 stores a SHA-256 fingerprint instead of a raw filesystem path. H05 stores process names without their command-line arguments.
+- Immutable snapshots are published from temporary private directories. Mutating commands use cooperative locks. The toolkit records partial collector failures rather than inventing complete diagnostics.
+- Export uses an allowlist, separate private staging, public redaction, restricted output placement and no-overwrite behavior. H07 enforces an **actual decompressed-data ceiling** (including concatenated gzip members), sanitizes selected structured host/network fields, builds public reports from sanitized inputs and verifies sanitized comparison JSON.
+- Export `SHA256SUMS` supports **integrity checks**, not authentication or authorship. Retention is explicitly invoked and never automatically prunes incident evidence.
 
-## What is not claimed
+## Privacy remains a human responsibility
 
-A malicious process running as the same UID as the operator can still race filesystem checks. This Bash implementation does not provide atomic openat-style path security; it is not appropriate for adversarial multi-user evidence custody. `flock` prevents cooperating concurrent writers but cannot defeat an attacker controlling the same user account. Metadata editing outside the application is not authenticated. Automatic pattern redaction cannot replace a privacy review.
+Private diagnostics, journal records and operator notes may contain addresses, user names, tokens, secrets or sensitive context. Public-stage sanitization addresses recognized patterns, but **cannot guarantee anonymity or remove all secrets**. Review any proposed handoff member, including decompressed text/JSONL and reports, before external sharing. Never push real incident exports, SSH keys, internal logs, customer identifiers or personal Windows paths to GitHub.
 
-## Verification and safe test exercises
+Avoid placing secrets into sample commands and KBs. Only include **explicitly synthetic** sample data in public case studies. See [release checklist](release-checklist.md).
 
-Run `tests/run-all.sh` as an unprivileged user. Tests include mocked/fixture evidence, invalid ID and shell-like service strings, duplicate records, unsafe permissions, corruption, symlink prevention, gzip integrity, handoff hashes, seeded credentials and retention dry-run. Restore the VM snapshot after each deliberately broken system component.
+## Important limitations
 
-## Release checklist
+- A hostile process with the **same UID** can race Bash-level file and symlink checks; this implementation does not use atomic `openat`-style secure file handles or provide multi-user forensic custody.
+- `flock` coordinates cooperating writers; neither hashes nor local timestamps are cryptographic proof of trustworthy provenance.
+- Bounds are best effort; this shell program is not kernel-enforced process-resource isolation.
+- A TCP listener does not prove HTTP health or application ownership. HTTP 5xx is an observed application status, not a collector failure. `ps` CPU% is lifetime-average. Journal absence does not prove a broken logger. A successful process/service state alone does not establish an incident's root cause.
+- Ubuntu/WSL systemd and journal permissions can limit visibility. Nginx checks can produce `permission_limited` in WSL 2 because of `/run/nginx.pid`; do not run the toolkit with `sudo` to suppress the warning.
+- The WSL 2 test record does **not** prove parity with native Ubuntu Server, VirtualBox, or production systems.
 
-Before publication verify `git status`, inspect `git diff --cached`, ensure `.local`, VM images, raw journal files and secrets are absent, and search release source/examples for personal identifiers. Sanitized archive examples require a second human review. See [operations](operations.md) and [incident status](incidents/STATUS.md).
+## Responsible disclosure and validation
+
+Report suspected security defects privately following [SECURITY.md](../SECURITY.md), using small synthetic reproductions rather than real secrets. Run `bash tests/run-all.sh` and verify no unexpected SKIP lines. For release, inspect the staged diff, URLs, case studies and export examples before pushing; see [testing](testing.md) and [release checklist](release-checklist.md).

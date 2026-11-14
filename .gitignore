@@ -30,3 +30,8 @@ exports/
 coverage/
 # Reviewed synthetic-only log fixtures are intentional source artifacts.
 !tests/fixtures/*.log
+__pycache__/
+*.py[cod]
+*.orig
+*.rej
+*.patch
